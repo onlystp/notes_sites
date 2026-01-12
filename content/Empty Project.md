@@ -750,16 +750,81 @@ $ precompile # 比較全面，因為是使用 rails 環境來編譯
 
 # 專案可優化部分
 
-- ✅ meta.html.erb 內的 charset="uft-8" 錯誤，應改成 "utf-8"
-- 開發模式下，turbo event 堆疊會造成效能不好
-- ESLint 跟 Prettier 的 format 衝突，會卡在存檔機制無法改成 ESLint 的格式。
-	- 目前在 vscode 設定存檔行為可以稍微解決， 但文字長度排版、Object 排版不會被執行。
+## 已解決
 
-# 延伸問題
+- ✅ meta.html.erb 內的 charset="uft-8" 錯誤，應改成 "utf-8"
+- 
+
+### ESLint and Prettier conflicts
+
+ESLint 跟 Prettier 雖各有各的職責，但還是有重疊 format 的部分。這邊的解決方式，是以：<span style="color:rgb(0, 176, 80)">不修改團隊原本習慣的 format 為原則，讓 ESLint 去執行 Prettier 的規則。並安裝套件解決兩者衝突。</span>
+
+1‍⃣ 步驟一
+
+修改 VSCode user setting：
+
+```json
+{
+	// 關掉 VSCode 預設的存檔 format 功能（預設是吃 Prettier）
+	"editor.formatOnSave": false,
+	// 打開 ESLint 的 auto format on save 功能
+	"editor.codeActionsOnSave": {
+		"source.fixAll.eslint": "explicit"
+},
+```
+
+2‍⃣ 步驟二：
+
+安裝 `eslint-plugin-prettier` 套件，這個套件的目的是讓 ESLint 去把 Prettier 的規則容納進來執行。
+
+```shell
+npm i -D eslint-config-prettier
+```
+
+然後在 ESLint 設定檔將剛剛安裝的套件引入，並註冊在 ESLint 的 `plugins`：
+
+```js title:"eslint.config.mjs"
+import pluginPrettier from 'eslint-plugin-prettier'
+
+export default [
+	plugins: {
+		// 前略...
+		prettier: pluginPrettier
+	}
+]
+```
+
+3‍⃣ 步驟三：
+
+安裝 `eslint-config-prettier` 套件，讓這個套件自動解決兩者的衝突。
+
+```shell
+npm i -D eslint-config-prettier
+```
+
+然後在 ESLint 設定檔註冊成 config（要放在最後，（要放在最後，規則最後才會吃它的）：
+
+```js title:"eslint.config.mjs
+import configPrettier from 'eslint-config-prettier'
+
+export default [
+	// 前略...
+	configPrettier
+]
+```
+
+都完成之後建議重開 VSCode 或 Refresh window，確認問題是否都解決了。
+
+## 待解決
+
+- 開發模式下，turbo event 堆疊會造成效能不好
+
+
+# 其它延伸問題
 
 
 > [!SUCCESS] 共用的 Vue Component、全域 CSS Style 是可以被修改的嗎？
 > 可以
 
-> [!SUCCESS] 安裝享用的套件
+> [!SUCCESS] 可以安裝想用的套件嗎？
 > 可以
