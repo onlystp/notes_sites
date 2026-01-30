@@ -12,6 +12,6 @@ title: 🚀 Jin's Notes
 
 - [[Empty Project]]
 
-- [[專案流程練習]]
+- [[專案流程]]
 
 - [[Tailwind CSS]]

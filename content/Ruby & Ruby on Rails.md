@@ -96,13 +96,14 @@ status = (age >= 18) ? "成年" ： "未成年"
 
 ```ruby
 fruit = "apple"
+
 case fruit
-when "apple"
-  puts "這是蘋果"
-when "banana"
-  puts "這是香蕉"
-else
-  puts "未知水果"
+	when "apple"
+	  puts "這是蘋果"
+	when "banana"
+	  puts "這是香蕉"
+	else
+	  puts "未知水果"
 end
 ```
 
@@ -137,7 +138,7 @@ end
 puts add(5, 3) # 印出 8
 ```
 
-**慣例**：如果方法會回傳布林值（true/false），通常會在名稱後面加問號，例如 `empty?`。如果是會修改物件本身的「危險」方法，通常會加驚嘆號，例如 `sort!`。
+**慣例**：如果方法會回傳 Boolean（true / false），通常會在名稱後面加問號，例如 `empty?`。如果是會修改物件本身的「危險」方法，通常會加驚嘆號，例如 `sort!`。
 
 ## 語法特性補充
 
@@ -370,7 +371,7 @@ Rails 的特殊 tags 為：
 
 ### Passing Data
 
-父層使用 `local` 來傳遞資料：
+父層使用 `locals` 來傳遞資料：
 
 ```html
 <h1>Products</h1>
@@ -419,8 +420,8 @@ def show
   # 定義實例變數 @user
   @user = User.find(params[:id]) 
   
-  # 沒帶 @ 的變數，View 讀不到
-  local_info = "這段話傳不過去" 
+  # 沒帶 @ 的變數
+  local_info = "View 讀不到" 
 end
 ```
 
@@ -430,6 +431,7 @@ end
 
 <p><%= local_info %></p>
 ```
+
 
 ## 常見的 Rails 指令
 
@@ -479,6 +481,7 @@ rails db：migrate
 ```
 
 回復 Migration
+
 ```shell
 rails db：rollback
 ```
@@ -536,10 +539,10 @@ bin/rails destroy controller Pages home
     end
     ```
 
-- 如何在視圖中顯示變數？
+- 如何在 views 取得變數？
     在控制器中設置實例變數，然後在視圖中使用 ERB 語法來顯示。
 
-    例如，在控制器中：
+    例如，在 controllers 內定義 @ 變數：
     ```ruby
     class WelcomeController < ApplicationController
       def index
@@ -548,7 +551,7 @@ bin/rails destroy controller Pages home
     end
     ```
 
-    在視圖中：
+    在 views：
 
     ```html
     <%= @message %>

@@ -210,7 +210,7 @@ module.exports = {
 
 # 樣式打包與復用
 
-如果不想要寫落落長的 class：
+如果不想要寫落落長的 class，可以有以下解法。
 
 ## Custom Utilities
 

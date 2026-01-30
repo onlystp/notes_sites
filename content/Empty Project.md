@@ -27,8 +27,8 @@
 }
 ```
 
-- 源碼目錄為 packs（存放前端代碼）。
-- 監視額外路徑如 views（當 Rails 視圖變更時自動重新打包）。
+- 源碼目錄為 `packs/`（存放前端代碼）。
+- 監視額外路徑如 `views/`（當 Rails 視圖變更時自動重新打包）。
 - 開發模式下自動建置並運行在 `http：//0.0.0.0：3036`。
 
 ## Vite 配置
@@ -69,7 +69,7 @@ export default defineConfig({
 - 使用 `vite-plugin-ruby` 插件，讓 Vite 與 Rails 環境無縫整合。
 - 加入 `@vitejs/plugin-vue` 插件來處理 `.vue` 文件。
 - 配置 Vue 別名：`'vue'： 'vue/dist/vue.esm-bundler.js'`，確保使用完整的 Vue 版本。
-- 支援多種文件擴展名，包括 `.vue`、`.js`、`.ts` 等。
+- 支援多種文件，包括 `.vue`、`.js`、`.ts` 等。
 - 建置時將 Vue 和 Ant Design Vue 分離成獨立 chunk，以優化載入效能。
 
 ## 前端代碼結構
@@ -79,7 +79,118 @@ export default defineConfig({
   - `src/vueComponents/`：存放 Vue 組件，如 `IndexPage.vue`。
   - `src/javascripts/`：存放 JavaScript 邏輯和插件。
 
-## Vue 組件的載入機制
+## Turbo
+
+Turbo (Hotwire) 的事件體系非常完整，理解它們就像理解網頁的「生命週期」。當你從頁面 A 跳到頁面 B 時，Turbo 會經歷一系列過程，你可以根據需求在不同階段切入。
+
+主要可以分為以下三大類：
+
+### Event
+
+下列為最常用的，當使用者點擊連結或瀏覽器前進/後退時觸發。
+
+|**事件名稱**|**觸發時機**|**常用情境**|
+|---|---|---|
+|**`turbo:click`**|點擊標記為 Turbo 的連結時。|顯示自定義載入動畫。|
+|**`turbo:before-visit`**|導航開始前（最快的一環）。|**取消導航**（例如表單未儲存時彈出確認）。|
+|**`turbo:visit`**|向伺服器發送請求時。|紀錄追蹤代碼 (Analytics)。|
+|**`turbo:submit-start`**|表單開始送出時。|禁用送出按鈕防止重複點擊。|
+|**`turbo:before-render`**|得到回應後，**替換 HTML 前**。|修改回傳的 HTML 或加入切換動畫。|
+|**`turbo:render`**|**替換 HTML 後**，渲染完成。|重新初始化頁面上的小工具。|
+|**`turbo:load`**|頁面載入完成（初次或導航後）。|**最推薦的 JS 初始化位置**（類似 `DOMContentLoaded`）。|
+
+#### 快取與清理事件 (Caching)
+
+- **`turbo:before-cache`**：
+    
+    - **觸發時機**：在 Turbo 把當前頁面存入「快取快照」之前。
+    - **關鍵用途**：**清理工作**。關閉 Observer、重設 Vue 實例、關閉打開的 Modal。如果不在此清理，回上一頁時會看到「殘留」的 UI 或重複的監聽器。
+
+使用範例： `ResizeObserver` 洩漏問題的關鍵。
+
+```js title:"user.js"
+// 在 Turbo 把當前頁面存入快取前，把 Observer 停掉，才不會一直疊加新的監測
+const cleanup = setIndexTableHeight(indexSearchApp)
+document.addEventListener(
+	'turbo:before-cache',
+	() => cleanup?.(),
+	{ once: true }
+)
+```
+
+```js title:"setIndexTableHeight.js"
+function setIndexTableHeight (searchSection) {
+	const tableContainer = document.querySelector('.form-container')
+	if (searchSection && tableContainer) {
+		const resizeObserver = new ResizeObserver(() => {
+			// 略
+		})
+		resizeObserver.observe(searchSection)
+		// 離開頁面停止監測
+		return () => resizeObserver.disconnect()
+	}
+}
+```
+
+#### Frame 與 Stream 事件 (局部更新)
+
+當你使用 `turbo-frame` 或 `turbo-stream` 時會觸發。
+- **`turbo:frame-load`**：當一個 `turbo-frame` 內容加載完成時。
+- **`turbo:before-stream-render`**：當 Stream 準備插入新的 HTML 碎片前。
+
+---
+
+#### 💡 範例
+
+情境 A：想在每一頁都執行某個 JS（例如初始化按鈕）
+
+不要用原生 `window.onload`，要用 `turbo:load`：
+
+```js
+document.addEventListener('turbo:load', () => {
+  console.log('頁面已就緒，無論是初次載入還是跳轉回來的')
+})
+```
+
+---
+
+情境 B：攔截導航（未儲存警告）
+
+使用 `turbo:before-visit`：
+
+```js
+document.addEventListener('turbo:before-visit', (event) => {
+  if (hasUnsavedChanges) {
+    if (!confirm("變更尚未儲存，確定離開？")) {
+      event.preventDefault() // 攔截並停止跳轉
+    }
+  }
+})
+```
+
+---
+
+情境 C：清理動作
+
+使用 `turbo:before-cache`：
+
+```js
+document.addEventListener('turbo:before-cache', () => {
+  // 這裡執行 disconnect() 或 destroy()
+}, { once: true })
+```
+
+---
+
+💡 為什麼要有這麼多事件？
+
+因為 Turbo 不是真的「換頁」，它只是用 AJAX 抓回新頁面的 `<body>` 然後蓋掉舊的。如果你在 A 頁面監聽了 `scroll`，跳到 B 頁面時那個監聽器**依然活著**。必須養成在 `before-cache` 清理、在 `load` 或 `render` 重新掛載的好習慣。
+
+**如果有遇到「按回上一頁，畫面長得怪怪的」或者「功能失效」**，這通常就是 `turbo:render` 與 `turbo:before-cache` 沒配對好的徵兆。
+
+---
+
+### Vue 組件的載入機制
 
 **按頁面動態載入**：不是一次性載入所有 Vue 組件，而是根據 Rails 控制器和動作動態掛載。
 
@@ -175,7 +286,7 @@ pageWatcher({
 
 Vue 組件透過 `props` 接收這些數據，並渲染動態內容。
 
-（此為專案的入口目錄）
+（ 此為專案的入口 view ）
 
 ```js= title="app/packs/src/vueComponent/session/IndexPage.vue"
 <script setup>
@@ -265,7 +376,8 @@ const welcomeText = `歡迎使用${I18n.t('system_name')}`
 
 ### Vite vs Rails CSS#
 
-vite_stylesheet_tag 跟 stylesheet_link_tag 差異？
+
+❓ vite_stylesheet_tag 跟 stylesheet_link_tag 差異？
 
 - `stylesheet_link_tag` 是 Rails 傳統的 **Sprockets (Asset Pipeline)** 在使用的
 - `vite_stylesheet_tag` 則是交給現代化的 **Vite** 來處理。
@@ -280,19 +392,21 @@ vite_stylesheet_tag 跟 stylesheet_link_tag 差異？
 | **檔案存放位置**      | `app/assets/stylesheets`                | `app/frontend/...` (通常)            |
 | **編譯工具**        | Ruby (Sprockets)                        | Go/JavaScript (esbuild/Rollup)     |
 
+---
+
 💡 為什麼在 Vite 專案中不能混用？
 
 如果你在專案中使用了 Vite，卻用 `stylesheet_link_tag` 去找 Vite 管理的檔案，會發生以下狀況：
 
-	1. **找不到檔案：** Rails 的 Asset Pipeline 找不到 Vite 資料夾裡的檔案，會噴出 `Asset not found` 錯誤。
+1. 找不到檔案：Rails 的 Asset Pipeline 找不到 Vite 資料夾裡的檔案，會噴出 `Asset not found` 錯誤。
+2. 沒有 Tailwind 效果：因為 Tailwind 插件是掛在 Vite 下面的（例如 `postcss.config.js`），Sprockets 看不懂這些設定，導致樣式失效。
 
-	2. **沒有 Tailwind 效果：** 因為你的 Tailwind 插件是掛在 Vite 下面的（例如 `postcss.config.js`），Sprockets 看不懂這些設定，導致樣式失效。
+---
 
 💡 該選哪一個？
 
-	- 如果你正在使用 **Tailwind CSS** 並且追求開發速度：**務必使用 `vite_stylesheet_tag`**。
-
-	- 只有當你有一些「極度傳統」的 CSS（例如放在 `vendor/assets` 裡的舊套件），且不想搬移到 Vite 結構時，才會用到 `stylesheet_link_tag`。
+- 如果你正在使用 **Tailwind CSS** 並且追求開發速度：**務必使用 `vite_stylesheet_tag`**。
+- 只有當你有一些「極度傳統」的 CSS（例如放在 `vendor/assets` 裡的舊套件），且不想搬移到 Vite 結構時，才會用到 `stylesheet_link_tag`。
 
 ## Meta Data
 
@@ -490,15 +604,13 @@ export default pageWatcher
 
 Prod Mode：
 
-```js=
-// app/packs/entrypoints/application.js
+```js title:"app/packs/entrypoints/application.js"
 import '@/src/javascripts/session/profile.js'
 ```
 
 Dev Mode
 
-```js=
-// app/packs/entrypoints/devApplication.js
+```js title:"app/packs/entrypoints/devApplication.js"
 import '@/src/javascripts/session/profile.js'
 ```
 
@@ -658,87 +770,6 @@ controllers/
 - **URL:** `/users?type=admin`
 - **Controller:** `params[:type]` 就會是 `"admin"`。
 
-# Staging Mode
-
-在網站上產品前，可以跑 staging 來讓 QC 可以測試。staging 是最接近 production 的環境，所以應該得用編譯好的靜態檔，來跑網站的測試。
-
-## DB key
-
-公司的 DB yaml key 是雜湊出來的，本地需要有 key 可以解雜湊的碼。目前我們的 DB 在 QC 要測試時，會有 stagin DB，但目前練習可以先借用 dev DB 就好。
-
-可以看到公司的 `config/credentials` 內已經有 `development.yml.enc`，裡面就是雜湊出來的亂碼。這是在 github 上拉得下來的，畢竟雜湊過了嘛。
-
-我們需要在本地建立 `development.key` 並放入 key 來解開 `development.yml.enc` 的雜湊碼：
-
-```tree
-config/
-	└─ credentials/
-		├─ development.key
-		└─ development.yml.enc
-```
-
-因為是跑 staging mode，所以我們也要建一個 staging 的雜湊碼與相對應的 key：
-
-```shell
-EDITOR="vim" bin/rails credentials:edit -e staging
-```
-
-這個指令是在啟動「解密 -> 編輯 -> 重新加密」的自動化流程。
-
-- **解密：** 它會去讀取你的 `staging.key`，把原本亂碼般的 `staging.yml.enc` 解密成人類看得懂的文字。但如果這兩個檔案不存在：
-	- 自動生成一把新鑰匙：在 `config/credentials/` 底下建立 `staging.key`。
-	- 它會自動生成一個加密檔：在 `config/credentials/` 底下建立 `staging.yml.enc`。
-- 開啟 Vim 編輯：：讓你編輯這個 `tmp/` 資料夾下，全新的、內容幾乎是空白的暫存檔。
-- 重新加密： 當你在 Vim 輸入 `:wq` 存檔退出後，Rails 會立刻把新內容加密，並儲存覆蓋原本的加密檔。
-
-所以上面指令，會產生：
-
-```tree
-config/
-	└─ credentials/
-		├─ staging.key
-		└─ staging.yml.enc
-```
-## Build
-
-```shell
-$ RAILS_ENV=staging bundle exec vite build
-```
-
-## Staging Server
-
-```shell
-$ RAILS_ENV=staging bundle exec rails s -p ${PORT} -b 0.0.0.0
-```
-
-## 後續流程
-
-公司的 [QC 測試 Server](https://scada.amastek.com.tw/.ror/) 屆時需要用 Apache HTTP Server 跟 Nginx 來跑 Server，用的 IP 也跟 VM 的不一樣。但這到時候再繼續往前學習，目前先搞懂 Staging 的設定跟機制即可。
-
-## 清除靜態檔
-
-clobber rails 關鍵字自行搜尋
-
-```shell
-$ precompile # 比較全面，因為是使用 rails 環境來編譯
-```
-
-## 延伸問題
-
-- staging 的靜態檔放哪去了？
-
-> [!SUCCESS] 解答
-> 建在 `public/vite` 底下
-
-### `0.0.0.0` 到底是幹嘛的？
-
-> [!SUCCESS] `0.0.0.0` 是開放所有網域連上你開的伺服器
-> 如果設定了，其他人不管 IP 是多少，你開伺服器的 IP（比方 `124.xxx.xxx:6001`）也可以拜訪；沒有設定，就只有同網域可以拜訪。
-
-- 解完雜湊碼之後，怎麼連上 DB 的？
-- 目前是自動產 staging key，到時候真的要讓 QC 測的話，還是自己產嗎？
-
-
 # 前端套件使用
 
 - [swal](https://sweetalert2.github.io/) - 處理反饋 dialogs
@@ -753,7 +784,6 @@ $ precompile # 比較全面，因為是使用 rails 環境來編譯
 ## 已解決
 
 - ✅ meta.html.erb 內的 charset="uft-8" 錯誤，應改成 "utf-8"
-- 
 
 ### ESLint and Prettier conflicts
 
