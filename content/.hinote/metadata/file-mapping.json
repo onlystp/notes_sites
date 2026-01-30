@@ -1,0 +1,27 @@
+{
+  "version": "2.0",
+  "mapping": {
+    "Untitled.md": "untitled.md.json",
+    "JavaScript.md": "javascript.md.json",
+    "Untitled": "untitled.json",
+    "JS plugins": "js_plugins.json",
+    "Tablesorter.md": "tablesorter.md.json",
+    "JS plugins/Tablesorter.md": "js_plugins_tablesorter.md.json",
+    "Git": "git.json",
+    "JavaScript": "javascript.json",
+    "JavaScript/JavaScript.md": "javascript_javascript.md.json",
+    "JavaScript/ResizeObserve.md": "javascript_resizeobserve.md.json",
+    "Cherry-pick.md": "cherry-pick.md.json",
+    "Git/Cherry-pick.md": "git_cherry-pick.md.json",
+    "Git/Cherry Pick.md": "git_cherry_pick.md.json",
+    "VM 環境.md": "vm_環境.md.json",
+    "專案流程練習.md": "專案流程練習.md.json",
+    "專案流程.md": "專案流程.md.json",
+    "Vue": "vue.json",
+    "Vue2 & Vue3 差異.md": "vue2_&_vue3_差異.md.json",
+    "Vue/Vue2 & Vue3 差異.md": "vue_vue2_&_vue3_差異.md.json",
+    "defineModel.md": "definemodel.md.json",
+    "Vue/defineModel.md": "vue_definemodel.md.json"
+  },
+  "lastUpdated": 1769586027467
+}
