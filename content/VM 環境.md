@@ -133,7 +133,7 @@ screen -ls
 透過列出來的 ID 重新連接：
 
 ```
-screen -r 20451
+screen -r [PID]
 ```
 
  可以看到 Server 還在執行，就不需要重跑 server，或解決 port 佔用的問題。
@@ -143,10 +143,16 @@ screen -r 20451
 
 如果登入後發現 `screen -r` 進不去，或者 Server 真的死掉了導致 Port 佔用，可以這樣清理：
 
-強制清掉 screen
+強制清掉所有 screen
 
 ```shell
 screen -wipe
+```
+
+清除特定的 screen
+
+```shell
+screen -X -S [PID] quit
 ```
 
 或單純離開，先進入 Screen session 後輸入
